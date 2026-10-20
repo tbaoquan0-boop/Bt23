@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đèn kéo quân</title>
+<style>
+  :root{
+    --night:#1a0d12;
+    --lacquer:#7a1522;
+    --gold:#e8b04a;
+    --paper:#fff1d6;
+    --glow:#ffb347;
+    --face-w:200px;
+    --face-h:340px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    min-height:100vh;
+    background:radial-gradient(ellipse at 50% 55%, #3b1620 0%, var(--night) 70%);
+    color:var(--paper);
+    font-family:Georgia,"Times New Roman",serif;
+    display:flex;flex-direction:column;align-items:center;
+    overflow-x:hidden;
+  }
+  header{text-align:center;padding:28px 16px 0}
+  h1{font-size:clamp(1.8rem,5vw,3rem);font-weight:700;letter-spacing:.04em;color:var(--gold)}
+  header p{margin-top:6px;opacity:.8;font-size:.95rem}
+  .sv{margin-top:10px;display:inline-block;padding:4px 14px;border:1px solid var(--gold);border-radius:999px;color:var(--gold);font-size:.9rem}
+
+  .stage{
+    position:relative;
+    width:100%;
+    height:min(520px,70vh);
+    perspective:1100px;
+    display:flex;align-items:center;justify-content:center;
+    margin-top:10px;
+  }
+  .stage::before{ /* quầng sáng từ ngọn nến bên trong */
+    content:"";position:absolute;width:340px;height:340px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,179,71,.35),transparent 68%);
+    filter:blur(10px);
+  }
+  .lantern{
+    position:relative;
+    width:var(--face-w);height:var(--face-h);
+    transform-style:preserve-3d;
+  }
+  .face{
+    position:absolute;inset:0;
+    border:6px solid var(--lacquer);
+    outline:2px solid var(--gold);
+    background:var(--paper);
+    overflow:hidden;
+    box-shadow:0 0 28px rgba(255,179,71,.45), inset 0 0 22px rgba(255,140,40,.5);
+    cursor:pointer;
+    backface-visibility:visible;
+  }
+  .face img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;display:block;filter:sepia(.15) saturate(1.1)}
+  .face .tag{
+    position:absolute;left:0;right:0;bottom:0;padding:6px;text-align:center;
+    background:linear-gradient(transparent,rgba(26,13,18,.85));color:var(--paper);font-size:.85rem;
+  }
+  .face:hover{box-shadow:0 0 40px rgba(255,200,100,.9), inset 0 0 22px rgba(255,140,40,.6)}
+  .roof,.base{
+    position:absolute;left:50%;transform:translateX(-50%);
+    background:var(--lacquer);border:2px solid var(--gold);
+  }
+  .status{margin:6px 0 24px;font-size:.95rem;color:var(--gold);min-height:1.4em;text-align:center}
+  nav a{color:var(--gold)}
+  @media (max-width:520px){:root{--face-w:140px;--face-h:250px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Đèn kéo quân</h1>
+  <p>Rê chuột vào một mặt đèn để dừng lại, rê ra đèn quay tiếp.</p>
+  <span class="sv">Họ tên: Trần Bảo Quân &middot; MSSV: 231A010275</span>
+</header>
+
+<main class="stage" aria-label="Đèn kéo quân 6 mặt">
+  <div class="lantern" id="lantern"></div>
+</main>
+<p class="status" id="status">Đèn đang quay</p>
+<nav><a href="index.html">&larr; Về trang chủ</a></nav>
+
+<script>
+  // 6 ảnh: đặt file vào thư mục img/ với tên 1.jpg ... 6.jpg
+  const images = [
+    { src: "2335.jpg", label: "Mặt 1" },
+    { src: "2342.webp", label: "Mặt 2" },
+    { src: "2357.jpg", label: "Mặt 3" },
+    { src: "2341.webp", label: "Mặt 4" },
+    { src: "2344.webp", label: "Mặt 5" },
+    { src: "2340.jpg", label: "Mặt 6" }
+  ];
+
+  const lantern = document.getElementById("lantern");
+  const status = document.getElementById("status");
+  const N = images.length;
+  const SPEED = 24; // độ / giây
+
+  function faceWidth(){ return parseFloat(getComputedStyle(lantern).width); }
+  // bán kính hình lăng trụ 6 cạnh: r = (w/2) / tan(π/N)
+  function radius(){ return (faceWidth() / 2) / Math.tan(Math.PI / N) + 8; }
+
+  const faces = images.map((item, i) => {
+    const el = document.createElement("div");
+    el.className = "face";
+    el.innerHTML = `<img src="${item.src}" alt="${item.label}"><div class="tag">${item.label}</div>`;
+    el.addEventListener("mouseenter", () => { paused = true;  status.textContent = "Đã dừng: " + item.label; });
+    el.addEventListener("mouseleave", () => { paused = false; status.textContent = "Đèn đang quay"; });
+    el.addEventListener("touchstart", () => { paused = !paused; status.textContent = paused ? "Đã dừng: " + item.label : "Đèn đang quay"; }, {passive:true});
+    // ảnh lỗi -> nền màu để vẫn thấy mặt đèn
+    el.querySelector("img").addEventListener("error", e => {
+      e.target.style.display = "none";
+      el.style.background = `hsl(${i * 60},55%,45%)`;
+    });
+    lantern.appendChild(el);
+    return el;
+  });
+
+  let angle = 0, paused = false, last = performance.now();
+
+  function layout(){
+    const r = radius();
+    faces.forEach((el, i) => {
+      el.style.transform = `rotateY(${i * (360 / N)}deg) translateZ(${r}px)`;
+    });
+  }
+  layout();
+  window.addEventListener("resize", layout);
+
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function tick(now){
+    const dt = (now - last) / 1000;
+    last = now;
+    if (!paused && !reduce) angle = (angle + SPEED * dt) % 360;
+    lantern.style.transform = `translateZ(${-radius()}px) rotateX(-8deg) rotateY(${angle}deg)`;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+</script>
+</body>
+</html>
